@@ -4,56 +4,48 @@ plugins {
 }
 
 android {
-    namespace = "com.ahmed.streamv21"
+    namespace = "com.ahmed.streamgit101"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.ahmed.streamv21"
+        applicationId = "com.ahmed.streamgit101"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 22
         versionName = "22.0.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
-        create("debugConfig") {
-            storeFile = file("${rootDir}/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
-        }
         create("releaseConfig") {
-            val customKeystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
-            val customKeystoreFile = customKeystorePath?.let { file(it) }
-            val fallbackKeystore = file("${rootDir}/release.keystore").takeIf { it.exists() }
-                ?: file("${rootDir}/debug.keystore")
+            val keystorePath = System.getenv("STREAM22_KEYSTORE_PATH")
+                ?: "${System.getProperty("user.home")}/.android/stream22-ci.keystore"
 
-            storeFile = if (customKeystoreFile != null && customKeystoreFile.exists()) customKeystoreFile else fallbackKeystore
-            storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: "android"
-            keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: "androiddebugkey"
-            keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: "android"
-            enableV1Signing = true
-            enableV2Signing = true
+            storeFile = file(keystorePath)
+            storePassword = System.getenv("STREAM22_KEYSTORE_PASSWORD") ?: "android"
+            keyAlias = System.getenv("STREAM22_KEY_ALIAS") ?: "stream22"
+            keyPassword = System.getenv("STREAM22_KEY_PASSWORD") ?: "android"
         }
     }
 
     buildTypes {
-        debug {
-            signingConfig = signingConfigs.getByName("debugConfig")
-        }
         release {
-            signingConfig = signingConfigs.getByName("releaseConfig")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+
+            signingConfig = signingConfigs.getByName("releaseConfig")
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
+
     buildFeatures {
         compose = true
     }
@@ -62,17 +54,24 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
+
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.material.icons.extended)
+
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.video)
     implementation(libs.androidx.camera.view)
+
+    implementation(libs.kotlinx.coroutines.android)
 
     debugImplementation(libs.androidx.ui.tooling)
 }
