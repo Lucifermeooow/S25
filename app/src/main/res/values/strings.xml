@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Stream 22</string>
+    <string name="live_badge">LIVE</string>
+    <string name="offline_badge">OFFLINE</string>
+    <string name="start_broadcast">Go Live</string>
+    <string name="stop_broadcast">End Stream</string>
+    <string name="destinations_title">Stream Destinations</string>
+    <string name="settings_title">Stream Settings</string>
+</resources>
