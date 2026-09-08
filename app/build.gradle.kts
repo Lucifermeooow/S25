@@ -22,6 +22,19 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+        create("releaseConfig") {
+            val customKeystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
+            val customKeystoreFile = customKeystorePath?.let { file(it) }
+            val fallbackKeystore = file("${rootDir}/release.keystore").takeIf { it.exists() }
+                ?: file("${rootDir}/debug.keystore")
+
+            storeFile = if (customKeystoreFile != null && customKeystoreFile.exists()) customKeystoreFile else fallbackKeystore
+            storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: "android"
+            keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: "androiddebugkey"
+            keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: "android"
+            enableV1Signing = true
+            enableV2Signing = true
+        }
     }
 
     buildTypes {
@@ -29,6 +42,7 @@ android {
             signingConfig = signingConfigs.getByName("debugConfig")
         }
         release {
+            signingConfig = signingConfigs.getByName("releaseConfig")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

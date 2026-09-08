@@ -25,9 +25,26 @@ android {
         jvmTarget = "17"
     }
 
+    signingConfigs {
+        create("release") {
+            val customKeystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
+            val customKeystoreFile = customKeystorePath?.let { file(it) }
+            val fallbackKeystore = file("${rootDir}/release.keystore").takeIf { it.exists() }
+                ?: file("${rootDir}/../debug.keystore").takeIf { it.exists() }
+                ?: file("${rootDir}/debug.keystore")
+
+            storeFile = if (customKeystoreFile != null && customKeystoreFile.exists()) customKeystoreFile else fallbackKeystore
+            storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: "android"
+            keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: "androiddebugkey"
+            keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: "android"
+            enableV1Signing = true
+            enableV2Signing = true
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             isShrinkResources = false
         }
