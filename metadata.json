@@ -1,0 +1,6 @@
+{
+  "name": "Stream 22",
+  "description": "Stream 22 Live Streaming Android Application with Camera Preview, RTMP Streaming, Multi-Platform Destinations and OAuth configuration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
