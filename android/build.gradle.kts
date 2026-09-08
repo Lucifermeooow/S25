@@ -29,11 +29,19 @@ subprojects {
             buildToolsVersion("35.0.0")
         }
     }
-    project.afterEvaluate {
-        val android = project.extensions.findByName("android") as? com.android.build.gradle.BaseExtension
-        android?.apply {
-            compileSdkVersion(35)
-            buildToolsVersion("35.0.0")
+    if (project.name != "app") {
+        try {
+            project.afterEvaluate {
+                project.extensions.findByType(com.android.build.gradle.BaseExtension::class.java)?.apply {
+                    compileSdkVersion(35)
+                    buildToolsVersion("35.0.0")
+                }
+            }
+        } catch (_: Throwable) {
+            project.extensions.findByType(com.android.build.gradle.BaseExtension::class.java)?.apply {
+                compileSdkVersion(35)
+                buildToolsVersion("35.0.0")
+            }
         }
     }
 }
