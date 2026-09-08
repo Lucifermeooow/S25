@@ -1,89 +1,207 @@
-name: Build Stream22 APK
+name: Stream 22 - Release APK
 
 on:
   workflow_dispatch:
   push:
     branches:
       - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
 
 jobs:
   build:
+    name: Build signed release APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Java 17
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "21"
           cache: gradle
 
-      - name: Create CI release keystore
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Show project structure
+        shell: bash
+        run: |
+          set -euxo pipefail
+          echo "PWD:"
+          pwd
+
+          echo "Root files:"
+          find . -maxdepth 2 -type f \
+            \( -name "settings.gradle*" \
+            -o -name "build.gradle*" \
+            -o -name "pubspec.yaml" \
+            -o -name "gradlew" \
+            -o -name "gradlew.bat" \) \
+            | sort
+
+      - name: Prepare Gradle wrapper
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            echo "Using root Gradle wrapper."
+            exit 0
+          fi
+
+          if [ -f "./android/gradlew" ]; then
+            chmod +x ./android/gradlew
+            echo "Found android/gradlew."
+            exit 0
+          fi
+
+          echo "No Gradle wrapper found. Generating one from the installed Gradle."
+
+          gradle --version
+
+          gradle wrapper \
+            --gradle-version 8.11.1 \
+            --distribution-type all
+
+          chmod +x ./gradlew
+
+      - name: Install Flutter dependencies
+        if: hashFiles('pubspec.yaml') != ''
+        run: flutter pub get
+
+      - name: Run Flutter analyze
+        if: hashFiles('pubspec.yaml') != ''
         shell: bash
         run: |
           set -e
 
-          mkdir -p "$HOME/.android"
+          if [ -d "test" ]; then
+            flutter analyze
+          else
+            echo "Flutter project found, continuing without test directory."
+            flutter analyze
+          fi
+
+      - name: Run Flutter tests
+        if: hashFiles('pubspec.yaml') != ''
+        shell: bash
+        run: |
+          set -e
+
+          if [ -d "test" ]; then
+            flutter test
+          else
+            echo "No Flutter test directory found. Skipping Flutter tests."
+          fi
+
+      - name: Create temporary CI signing keystore
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          KEYSTORE="$RUNNER_TEMP/stream22-release.keystore"
 
           keytool -genkeypair \
             -v \
-            -keystore "$HOME/.android/stream22-ci.keystore" \
+            -keystore "$KEYSTORE" \
             -storetype JKS \
-            -storepass android \
-            -alias stream22 \
-            -keypass android \
+            -storepass "android" \
+            -keypass "android" \
+            -alias "stream22" \
             -keyalg RSA \
             -keysize 2048 \
             -validity 10000 \
             -dname "CN=Stream 22, OU=CI, O=Stream 22, L=Unknown, ST=Unknown, C=US"
 
-          test -f "$HOME/.android/stream22-ci.keystore"
+          test -f "$KEYSTORE"
 
-      - name: Make Gradle executable
-        run: chmod +x ./gradlew
+          echo "STREAM22_KEYSTORE_PATH=$KEYSTORE" >> "$GITHUB_ENV"
+          echo "STREAM22_KEYSTORE_PASSWORD=android" >> "$GITHUB_ENV"
+          echo "STREAM22_KEY_ALIAS=stream22" >> "$GITHUB_ENV"
+          echo "STREAM22_KEY_PASSWORD=android" >> "$GITHUB_ENV"
 
-      - name: Clean
-        run: ./gradlew clean
-
-      - name: Build Release APK
-        env:
-          STREAM22_KEYSTORE_PATH: ${{ env.HOME }}/.android/stream22-ci.keystore
-          STREAM22_KEYSTORE_PASSWORD: android
-          STREAM22_KEY_ALIAS: stream22
-          STREAM22_KEY_PASSWORD: android
-        run: ./gradlew :app:assembleRelease --stacktrace
-
-      - name: Verify APK exists
+      - name: Build Android release APK
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
+
+          if [ -f "./gradlew" ]; then
+            GRADLE_CMD="./gradlew"
+          else
+            echo "Root gradlew was not found after preparation."
+            exit 1
+          fi
+
+          "$GRADLE_CMD" --version
+
+          "$GRADLE_CMD" \
+            :app:assembleRelease \
+            --stacktrace \
+            --no-daemon
+
+      - name: Find generated APK
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Searching for generated APK files..."
+
+          find . -type f \
+            \( -name "*.apk" -o -name "*.aab" \) \
+            -print \
+            | sort
 
           APK="app/build/outputs/apk/release/app-release.apk"
 
           if [ ! -f "$APK" ]; then
-            echo "ERROR: Release APK was not generated."
-            find app/build -type f | sort || true
+            echo "ERROR: Expected APK was not generated:"
+            echo "$APK"
             exit 1
           fi
 
           echo "APK found:"
           ls -lh "$APK"
 
-      - name: Verify APK signing
+      - name: Verify APK signature
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
           APK="app/build/outputs/apk/release/app-release.apk"
 
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" \
+            -type f -name apksigner \
+            | sort -V \
+            | tail -n 1)"
 
-      - name: Upload Release APK
+          if [ -z "$APKSIGNER" ]; then
+            echo "ERROR: apksigner was not found."
+            exit 1
+          fi
+
+          echo "Using:"
+          echo "$APKSIGNER"
+
+          "$APKSIGNER" verify --verbose "$APK"
+
+      - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: Stream22-release-apk
+          name: stream22-release-apk
           path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
+          retention-days: 14
